@@ -2,6 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 import docx2txt
 from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration
+import traceback
 
 # Function to read PDF and extract text
 def read_pdf(file):
@@ -17,16 +18,24 @@ def read_docx(file):
 
 # Initialize RAG components
 def initialize_rag():
-    tokenizer = RagTokenizer.from_pretrained("facebook/rag-sequence-nq")
-    retriever = RagRetriever.from_pretrained("facebook/rag-sequence-nq", index_name="exact")
-    model = RagSequenceForGeneration.from_pretrained("facebook/rag-sequence-nq", retriever=retriever)
-    return tokenizer, model
+    try:
+        tokenizer = RagTokenizer.from_pretrained("facebook/rag-sequence-nq")
+        retriever = RagRetriever.from_pretrained("facebook/rag-sequence-nq", index_name="exact")
+        model = RagSequenceForGeneration.from_pretrained("facebook/rag-sequence-nq", retriever=retriever)
+        return tokenizer, model
+    except Exception as e:
+        st.error(f"Error initializing RAG components: {e}")
+        st.stop()
 
 # Function to get answer from RAG model
 def get_answer(question, context, tokenizer, model):
-    inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
-    generated = model.generate(**inputs)
-    return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+    try:
+        inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+        generated = model.generate(**inputs)
+        return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+    except Exception as e:
+        st.error(f"Error generating answer: {e}")
+        return None
 
 # Streamlit app
 st.title("RAG-based Information Retrieval from PDF and DOCX")
@@ -47,15 +56,13 @@ if uploaded_file is not None:
     st.text_area("Extracted Text", value=document_text, height=300)
 
     # Initialize RAG model
-    try:
-        tokenizer, model = initialize_rag()
-    except ImportError as e:
-        st.error(f"An error occurred while loading the model: {e}")
-    else:
-        # Ask question
-        question = st.text_input("Ask a question about the document")
+    tokenizer, model = initialize_rag()
 
-        if question:
-            with st.spinner("Getting answer..."):
-                answer = get_answer(question, document_text, tokenizer, model)
+    # Ask question
+    question = st.text_input("Ask a question about the document")
+
+    if question:
+        with st.spinner("Getting answer..."):
+            answer = get_answer(question, document_text, tokenizer, model)
+        if answer is not None:
             st.write("Answer:", answer)
