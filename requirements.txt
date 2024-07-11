@@ -1,5 +1,7 @@
 streamlit
 pymupdf
+docx2txt
 transformers
 faiss-cpu
 numpy
+datasets
