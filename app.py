@@ -37,10 +37,22 @@ def get_answer(question, context, tokenizer, model):
         return None
 
 # Function to summarize text
-def summarize_text(text):
-    summarizer = pipeline("summarization")
-    summary = summarizer(text, max_length=150, min_length=30, do_sample=False)
-    return summary[0]['summary_text']
+def summarize_text(text, summarizer):
+    try:
+        summary = summarizer(text, max_length=150, min_length=30, do_sample=False)
+        return summary[0]['summary_text']
+    except Exception as e:
+        st.error(f"Error summarizing text: {e}")
+        return None
+
+# Initialize summarizer pipeline
+@st.cache_resource
+def load_summarizer():
+    try:
+        return pipeline("summarization", model="facebook/bart-large-cnn")
+    except Exception as e:
+        st.error(f"Error initializing summarizer: {e}")
+        st.stop()
 
 # Streamlit app
 st.title("RAG-based Information Retrieval from PDF and DOCX")
@@ -58,19 +70,23 @@ if uploaded_file is not None:
         with st.spinner("Reading DOCX..."):
             document_text = read_docx(uploaded_file)
 
+    # Load summarizer
+    summarizer = load_summarizer()
+
     # Summarize the extracted text
     with st.spinner("Summarizing text..."):
-        summary = summarize_text(document_text)
-    st.write("Summary:", summary)
+        summary = summarize_text(document_text, summarizer)
+    if summary:
+        st.write("Summary:", summary)
 
-    # Initialize RAG model
-    tokenizer, model = initialize_rag()
+        # Initialize RAG model
+        tokenizer, model = initialize_rag()
 
-    # Ask question
-    question = st.text_input("Ask a question about the document")
+        # Ask question
+        question = st.text_input("Ask a question about the document")
 
-    if question:
-        with st.spinner("Getting answer..."):
-            answer = get_answer(question, summary, tokenizer, model)
-        if answer is not None:
-            st.write("Answer:", answer)
+        if question:
+            with st.spinner("Getting answer..."):
+                answer = get_answer(question, summary, tokenizer, model)
+            if answer is not None:
+                st.write("Answer:", answer)
