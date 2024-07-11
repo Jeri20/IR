@@ -1,7 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import docx2txt
-from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration
+from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration, pipeline
 
 # Function to read PDF and extract text
 def read_pdf(file):
@@ -36,6 +36,12 @@ def get_answer(question, context, tokenizer, model):
         st.error(f"Error generating answer: {e}")
         return None
 
+# Function to summarize text
+def summarize_text(text):
+    summarizer = pipeline("summarization")
+    summary = summarizer(text, max_length=150, min_length=30, do_sample=False)
+    return summary[0]['summary_text']
+
 # Streamlit app
 st.title("RAG-based Information Retrieval from PDF and DOCX")
 
@@ -52,7 +58,10 @@ if uploaded_file is not None:
         with st.spinner("Reading DOCX..."):
             document_text = read_docx(uploaded_file)
 
-    st.text_area("Extracted Text", value=document_text, height=300)
+    # Summarize the extracted text
+    with st.spinner("Summarizing text..."):
+        summary = summarize_text(document_text)
+    st.write("Summary:", summary)
 
     # Initialize RAG model
     tokenizer, model = initialize_rag()
@@ -62,6 +71,6 @@ if uploaded_file is not None:
 
     if question:
         with st.spinner("Getting answer..."):
-            answer = get_answer(question, document_text, tokenizer, model)
+            answer = get_answer(question, summary, tokenizer, model)
         if answer is not None:
             st.write("Answer:", answer)
