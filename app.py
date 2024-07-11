@@ -36,11 +36,27 @@ def get_answer(question, context, tokenizer, model):
         st.error(f"Error generating answer: {e}")
         return None
 
+# Function to split text into smaller chunks
+def split_text(text, chunk_size=500):
+    text_chunks = []
+    while len(text) > chunk_size:
+        split_index = text[:chunk_size].rfind('. ')
+        if split_index == -1:
+            split_index = chunk_size
+        text_chunks.append(text[:split_index+1])
+        text = text[split_index+1:]
+    text_chunks.append(text)
+    return text_chunks
+
 # Function to summarize text
 def summarize_text(text, summarizer):
     try:
-        summary = summarizer(text, max_length=150, min_length=30, do_sample=False)
-        return summary[0]['summary_text']
+        text_chunks = split_text(text)
+        summaries = []
+        for chunk in text_chunks:
+            summary = summarizer(chunk, max_length=150, min_length=30, do_sample=False)
+            summaries.append(summary[0]['summary_text'])
+        return ' '.join(summaries)
     except Exception as e:
         st.error(f"Error summarizing text: {e}")
         return None
