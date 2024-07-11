@@ -2,7 +2,6 @@ import streamlit as st
 import fitz  # PyMuPDF
 import docx2txt
 from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration
-import traceback
 
 # Function to read PDF and extract text
 def read_pdf(file):
@@ -20,7 +19,7 @@ def read_docx(file):
 def initialize_rag():
     try:
         tokenizer = RagTokenizer.from_pretrained("facebook/rag-sequence-nq")
-        retriever = RagRetriever.from_pretrained("facebook/rag-sequence-nq", index_name="exact")
+        retriever = RagRetriever.from_pretrained("facebook/rag-sequence-nq", index_name="exact", trust_remote_code=True)
         model = RagSequenceForGeneration.from_pretrained("facebook/rag-sequence-nq", retriever=retriever)
         return tokenizer, model
     except Exception as e:
