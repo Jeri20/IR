@@ -2,8 +2,6 @@ import streamlit as st
 import fitz  # PyMuPDF
 import docx2txt
 from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration
-import faiss
-import numpy as np
 
 # Function to read PDF and extract text
 def read_pdf(file):
