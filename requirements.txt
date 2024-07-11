@@ -5,3 +5,7 @@ transformers
 faiss-cpu
 numpy
 datasets
+PyMuPDF
+docx2txt
+transformers
+torch
