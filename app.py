@@ -1,7 +1,7 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF for PDF reading
 import docx2txt
-from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration, pipeline
+from transformers import pipeline
 
 # Function to read PDF and extract text
 def read_pdf(file):
@@ -15,94 +15,48 @@ def read_pdf(file):
 def read_docx(file):
     return docx2txt.process(file)
 
-# Initialize RAG components
-def initialize_rag():
+# Function to summarize text using T5 model
+def summarize_text_t5(text, summarizer):
     try:
-        tokenizer = RagTokenizer.from_pretrained("facebook/rag-sequence-nq")
-        retriever = RagRetriever.from_pretrained("facebook/rag-sequence-nq", index_name="exact", trust_remote_code=True)
-        model = RagSequenceForGeneration.from_pretrained("facebook/rag-sequence-nq", retriever=retriever)
-        return tokenizer, model
-    except Exception as e:
-        st.error(f"Error initializing RAG components: {e}")
-        st.stop()
-
-# Function to get answer from RAG model
-def get_answer(question, context, tokenizer, model):
-    try:
-        inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
-        generated = model.generate(**inputs)
-        return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
-    except Exception as e:
-        st.error(f"Error generating answer: {e}")
-        return None
-
-# Function to split text into smaller chunks
-def split_text(text, chunk_size=500):
-    text_chunks = []
-    while len(text) > chunk_size:
-        split_index = text[:chunk_size].rfind('. ')
-        if split_index == -1:
-            split_index = chunk_size
-        text_chunks.append(text[:split_index+1])
-        text = text[split_index+1:]
-    text_chunks.append(text)
-    return text_chunks
-
-# Function to summarize text
-def summarize_text(text, summarizer):
-    try:
-        text_chunks = split_text(text)
-        summaries = []
-        for chunk in text_chunks:
-            summary = summarizer(chunk, max_length=150, min_length=30, do_sample=False)
-            summaries.append(summary[0]['summary_text'])
-        return ' '.join(summaries)
+        if not text.strip():
+            return ""
+        # Split text into chunks that fit model's max_length
+        max_chunk_size = 512
+        chunks = [text[i:i + max_chunk_size] for i in range(0, len(text), max_chunk_size)]
+        summaries = [summarizer(chunk, max_length=150, min_length=30, do_sample=False)[0]['summary_text'] for chunk in chunks]
+        return " ".join(summaries)
     except Exception as e:
         st.error(f"Error summarizing text: {e}")
         return None
 
-# Initialize summarizer pipeline
-@st.cache_resource
-def load_summarizer():
-    try:
-        return pipeline("summarization", model="facebook/bart-large-cnn")
-    except Exception as e:
-        st.error(f"Error initializing summarizer: {e}")
-        st.stop()
+# Main function for the Streamlit app
+def summarization_page():
+    st.title("Text Summarization with T5")
 
-# Streamlit app
-st.title("RAG-based Information Retrieval from PDF and DOCX")
+    # Upload document
+    uploaded_file = st.file_uploader("Upload a PDF or DOCX file", type=["pdf", "docx"])
+    if uploaded_file is not None:
+        file_type = uploaded_file.name.split('.')[-1]
 
-# Upload document
-uploaded_file = st.file_uploader("Upload a PDF or DOCX file", type=["pdf", "docx"])
-
-if uploaded_file is not None:
-    file_type = uploaded_file.name.split('.')[-1]
-
-    if file_type == "pdf":
-        with st.spinner("Reading PDF..."):
+        # Read PDF or DOCX and extract text
+        if file_type == "pdf":
             document_text = read_pdf(uploaded_file)
-    elif file_type == "docx":
-        with st.spinner("Reading DOCX..."):
+        elif file_type == "docx":
             document_text = read_docx(uploaded_file)
+        else:
+            st.error("Unsupported file format. Please upload a PDF or DOCX file.")
+            return
+        
+        # Initialize T5 summarizer pipeline
+        summarizer_t5 = pipeline("summarization", model="t5-small")
 
-    # Load summarizer
-    summarizer = load_summarizer()
+        # Summarize the extracted text
+        with st.spinner("Summarizing text..."):
+            summary_t5 = summarize_text_t5(document_text, summarizer_t5)
+        
+        if summary_t5:
+            st.subheader("Summary (T5):")
+            st.write(summary_t5)
 
-    # Summarize the extracted text
-    with st.spinner("Summarizing text..."):
-        summary = summarize_text(document_text, summarizer)
-    if summary:
-        st.write("Summary:", summary)
-
-        # Initialize RAG model
-        tokenizer, model = initialize_rag()
-
-        # Ask question
-        question = st.text_input("Ask a question about the document")
-
-        if question:
-            with st.spinner("Getting answer..."):
-                answer = get_answer(question, summary, tokenizer, model)
-            if answer is not None:
-                st.write("Answer:", answer)
+if __name__ == "__main__":
+    summarization_page()
